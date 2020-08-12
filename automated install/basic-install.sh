@@ -183,27 +183,23 @@ os_check() {
     # and determines whether or not the script is running on one of those systems
     local remote_os_domain valid_os valid_version detected_os_pretty detected_os detected_version display_warning
     remote_os_domain="versions.pi-hole.net"
-    valid_os=false
-    valid_version=false
-    display_warning=true
 
-    detected_os_pretty=$(cat /etc/*release | grep PRETTY_NAME | cut -d '=' -f2- | tr -d '"')
-    detected_os="${detected_os_pretty%% *}"
-    detected_version=$(cat /etc/*release | grep VERSION_ID | cut -d '=' -f2- | tr -d '"')
+    detected_os=$(grep "\bID\b" /etc/os-release | cut -d '=' -f2 | tr -d '"')
+    detected_version=$(grep VERSION_ID /etc/os-release | cut -d '=' -f2 | tr -d '"')
 
     IFS=" " read -r -a supportedOS < <(dig +short -t txt ${remote_os_domain} | tr -d '"')
 
-    for i in "${supportedOS[@]}"
+    for distro_and_versions in "${supportedOS[@]}"
     do
-        os_part=$(echo "$i" | cut -d '=' -f1)
-        versions_part=$(echo "$i" | cut -d '=' -f2-)
+        distro_part="${distro_and_versions%%=*}"
+        versions_part="${distro_and_versions##*=}"
 
-        if [[ "${detected_os}" =~ ${os_part} ]]; then
+        if [[ "${detected_os^^}" =~ ${distro_part^^} ]]; then
           valid_os=true
           IFS="," read -r -a supportedVer <<<"${versions_part}"
-          for x in "${supportedVer[@]}"
+          for version in "${supportedVer[@]}"
           do
-            if [[ "${detected_version}" =~ $x ]];then
+            if [[ "${detected_version}" =~ $version ]];then
               valid_version=true
               break
             fi
@@ -216,7 +212,7 @@ os_check() {
         display_warning=false
     fi
 
-    if [ "$display_warning" = true ] && [ "$PIHOLE_SKIP_OS_CHECK" != true ]; then
+    if [ "$display_warning" != false ] && [ "$PIHOLE_SKIP_OS_CHECK" != true ]; then
         printf "  %b %bUnsupported OS detected%b\\n" "${CROSS}" "${COL_LIGHT_RED}" "${COL_NC}"
         printf "      https://docs.pi-hole.net/main/prerequesites/#supported-operating-systems\\n"
         printf "\\n"
@@ -226,7 +222,7 @@ os_check() {
         printf "      If that is the case, you can feel free to ask the community on Discourse with the %bCommunity Help%b category:\\n" "${COL_LIGHT_RED}" "${COL_NC}"
         printf "      https://discourse.pi-hole.net/c/bugs-problems-issues/community-help/\\n"
         exit 1
-    elif [ "$display_warning" = true ] && [ "$PIHOLE_SKIP_OS_CHECK" = true ]; then
+    elif [ "$display_warning" != false ] && [ "$PIHOLE_SKIP_OS_CHECK" = true ]; then
         printf "  %b %bUnsupported OS detected%b. PIHOLE_SKIP_OS_CHECK env variable set to true - installer will continue\\n" "${INFO}" "${COL_LIGHT_RED}" "${COL_NC}"
     else
         printf "  %b %bSupported OS detected%b\\n" "${TICK}" "${COL_LIGHT_GREEN}" "${COL_NC}"
